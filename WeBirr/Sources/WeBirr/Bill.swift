@@ -1,13 +1,13 @@
 
 public struct Bill : Codable {
     
-        var customerCode : String = ""
-        var customerName : String = ""
-        var billReference : String = ""
-        var time : String = ""
-        var description : String = ""
-        var amount : String = ""
-        var merchantID : String = ""
+        public var customerCode : String = ""
+        public var customerName : String = ""
+        public var billReference : String = ""
+        public var time : String = ""
+        public var description : String = ""
+        public var amount : String = ""
+        public var merchantID : String = ""
     
     public init(customerCode : String,customerName : String,billReference : String,
                 time : String, description : String, amount : String, merchantID : String ) {
