@@ -66,16 +66,16 @@ public final class WeBirrClient {
      * ApiResponse.res?.isPaid ?? false -> will return true if the bill is paid (payment completed)
      * ApiResponse.res?.data ?? null -> will have [PaymentDetail] object
      */
-    public func getPaymentStatus(paymentCode: String, callBack:@escaping (ApiResponse<String>) -> Void ) {
+    public func getPaymentStatusAsync(paymentCode: String, callBack:@escaping (ApiResponse<Payment>) -> Void ) {
 
         request(.GET, path: "/einvoice/api/getpaymentstatus?api_key=\(_apiKey)&wbc_code=\(paymentCode)", body: "", callBack: callBack)
        
     }
     
-    
+ // helper method 
     private func request<T : Encodable, V: Decodable>(_ verb: Verb, path: String, body: T, callBack:@escaping (ApiResponse<V>) -> Void ) {
         
-        let url: URL = URL(string: "\(_baseAddress)\(path)")!
+        let url: URL = URL(string: "\(_baseAddress)\(path.replacingOccurrences(of: " ", with: ""))")!
         var request = URLRequest(url: url)
         request.httpMethod = verb.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Accept")
