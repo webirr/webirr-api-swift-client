@@ -1,13 +1,13 @@
 public struct ApiResponse<T : Codable> : Codable {
     
-    var error: String? = nil
-    var errorCode: String? = nil
-    var res : T? = nil
+    public var error: String? = nil
+    public var errorCode: String? = nil
+    public var res : T? = nil
     
-    init() {}
-    
-    init(error: String) {
+    public init(error: String? = nil, errorCode: String? = nil, res : T? = nil ){
         self.error = error
+        self.errorCode = errorCode
+        self.res = res
     }
     
 }
