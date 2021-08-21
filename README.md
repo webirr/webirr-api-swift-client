@@ -8,7 +8,7 @@ Add WeBirr as Package Dependency
 
 >To add a package dependency to your Xcode project, select 
 File > Swift Packages > Add Package Dependency & enter the repository URL
-https://github.com/webirr/webirr-api-swift-client   [read more](https://developer.apple.com/documentation/swift_packages/adding_package_dependencies_to_your_app)
+https://github.com/webirr/webirr-api-swift-client     |    [read more](https://developer.apple.com/documentation/swift_packages/adding_package_dependencies_to_your_app)
 
 ## Usage
 
