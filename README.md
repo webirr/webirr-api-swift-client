@@ -4,16 +4,14 @@ This Client Library provides convenient access to WeBirr Payment Gateway APIs fr
 
 ## Install
 
-Using Swift Package Manager
+Add WeBirr as Package Dependency
 
-include the following lines to your Package.swift to import webirr client library into your Project
+*To add a package dependency to your Xcode project, select 
+File > Swift Packages > Add Package Dependency & enter the repository URL
+https://github.com/webirr/webirr-api-swift-client
 
-
-```bash
-dependencies: [
-    .package(url: "https://github.com/webirr/webirr-api-swift-client.git", from: "1.0.0"),
-]
-```
+[read more](https://developer.apple.com/documentation/swift_packages/adding_package_dependencies_to_your_app)
+*
 ## Usage
 
 The library needs to be configured with a *merchant Id* & *API key*. You can get it by contacting [webirr.com](https://webirr.com)
