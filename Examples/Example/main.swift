@@ -14,6 +14,7 @@ getBillAndListBillsAsync(billReference: savedBillReference, paymentCode: savedPa
 deleteBillAsync(paymentCode: savedPaymentCode)
 BulkPaymentPollingConsumer(api: api).fetchAndProcessPayments()
 getStatAsync()
+getSupportedBanksAsync()
 
 /**
  * Creating a new Bill / Updating an existing Bill on WeBirr Servers
@@ -244,6 +245,28 @@ func getStatAsync() {
                 print("Amount Unpaid: \(resp.res?.amountUnpaid ?? 0)")
             } else {
                 // fail
+                print("error: \(resp.error!)")
+                print("errorCode: \(resp.errorCode ?? "")")
+            }
+            done()
+        }
+    }
+}
+
+/**
+ * Getting banks enabled for this merchant checkout.
+ */
+func getSupportedBanksAsync() {
+    print("Getting Supported Banks...")
+
+    wait { done in
+        api.getSupportedBanksAsync { resp in
+            if resp.error == nil {
+                for bank in resp.res ?? [] {
+                    print("\(bank.bankID) - \(bank.name)")
+                }
+                print("Use only these merchant-specific banks when showing checkout payment instructions.")
+            } else {
                 print("error: \(resp.error!)")
                 print("errorCode: \(resp.errorCode ?? "")")
             }

@@ -145,6 +145,13 @@ final class WeBirrTests: XCTestCase {
         ]))
         XCTAssertEqual(stat.nBills, 2)
         XCTAssertEqual(stat.amountBills, 548)
+
+        let bank = try JSONDecoder().decode(SupportedBank.self, from: jsonData([
+            "bankID": "cbe_mobile",
+            "name": "CBE Mobile Banking"
+        ]))
+        XCTAssertEqual(bank.bankID, "cbe_mobile")
+        XCTAssertEqual(bank.name, "CBE Mobile Banking")
     }
 
     func testAllEndpointsReturnAPIErrorPayload() {
@@ -238,6 +245,16 @@ final class WeBirrTests: XCTestCase {
         }
         assertNoApiError(stat, "getStat")
         XCTAssertNotNil(stat.res)
+
+        let supportedBanks: ApiResponse<[SupportedBank]> = waitForResponse { done in
+            api.getSupportedBanksAsync(callBack: done)
+        }
+        assertNoApiError(supportedBanks, "getSupportedBanks")
+        XCTAssertFalse(supportedBanks.res?.isEmpty ?? true)
+        for bank in supportedBanks.res ?? [] {
+            XCTAssertFalse(bank.bankID.isEmpty)
+            XCTAssertFalse(bank.name.isEmpty)
+        }
 
         let deleteResponse: ApiResponse<String> = waitForResponse { done in
             api.deleteBillAsync(paymentCode: paymentCode, callBack: done)
@@ -418,6 +435,15 @@ final class WeBirrTests: XCTestCase {
                     api.getStatAsync(dateFrom: "2025-01-01", dateTo: "2030-01-31") { response in
                         done(response.asStringResponse())
                     }
+                }
+            ),
+            EndpointCall(
+                name: "getSupportedBanks",
+                method: "GET",
+                path: "/einvoice/api/banks",
+                expectedQuery: [:],
+                invoke: { api, done in
+                    api.getSupportedBanksAsync { response in done(response.asStringResponse()) }
                 }
             )
         ]
