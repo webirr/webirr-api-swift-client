@@ -172,6 +172,16 @@ public final class WeBirrClient {
         )
     }
 
+    public func getSupportedBanksAsync(
+        callBack: @escaping (ApiResponse<[SupportedBank]>) -> Void
+    ) {
+        request(
+            .GET,
+            path: "/einvoice/api/banks",
+            callBack: callBack
+        )
+    }
+
     private func prepareBill(_ bill: Bill) -> Bill {
         var prepared = bill
         if !merchantId.isEmpty {

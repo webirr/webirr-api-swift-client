@@ -188,6 +188,36 @@ func getBillAndListBillsAsync() {
 }
 ```
 
+### Getting Supported Banks for Checkout
+
+```swift
+import Foundation
+import WeBirr
+
+let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
+let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
+
+func getSupportedBanksAsync() {
+    let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
+
+    print("Getting Supported Banks...")
+
+    api.getSupportedBanksAsync { resp in
+        if resp.error == nil {
+            for bank in resp.res ?? [] {
+                print("\(bank.bankID) - \(bank.name)")
+            }
+            print("Use only these merchant-specific banks when showing checkout payment instructions.")
+        } else {
+            print("error: \(resp.error!)")
+            print("errorCode: \(resp.errorCode ?? "")")
+        }
+    }
+}
+```
+
+Checkout pages should render bank-specific instructions only from `getSupportedBanksAsync`. Do not show a broad static bank list unless those banks are returned for the configured merchant.
+
 ### Getting Payment status of an existing Bill from WeBirr Servers
 
 ```swift
@@ -431,6 +461,7 @@ The `Examples/Example/main.swift` file includes workflows equivalent to the READ
 | `getStatAsync` | Merchant stats by date range. |
 | `processWebhookPayment` | Webhook callback processing helper. |
 | `getBillAndListBillsAsync` | Get bill by reference, get bill by payment code, list bills. |
+| `getSupportedBanksAsync` | Get banks enabled for the configured merchant checkout. |
 
 ## Tests
 
