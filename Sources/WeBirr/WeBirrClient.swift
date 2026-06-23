@@ -29,6 +29,9 @@ extension URLSession: WeBirrURLSession {
  * It is a wrapper for the REST Web Service API.
  */
 public final class WeBirrClient {
+    private static let testBaseAddress = "https://api.webirr.dev"
+    private static let prodBaseAddress = "https://api.webirr.net:8080"
+
     private let apiKey: String
     private let merchantId: String
     private let baseAddress: String
@@ -50,8 +53,23 @@ public final class WeBirrClient {
     ) {
         self.apiKey = apiKey
         self.merchantId = merchantId
-        self.baseAddress = isTestEnv ? "https://api.webirr.net" : "https://api.webirr.net:8080"
+        self.baseAddress = Self.resolveBaseAddress(isTestEnv: isTestEnv)
         self.urlSession = urlSession
+    }
+
+    private static func resolveBaseAddress(isTestEnv: Bool) -> String {
+        guard isTestEnv else {
+            return prodBaseAddress
+        }
+
+        guard let gatewayURL = ProcessInfo.processInfo.environment["GATEWAY_URL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !gatewayURL.isEmpty else {
+            return testBaseAddress
+        }
+
+        let normalized = gatewayURL.trimmingTrailingSlashes()
+        return normalized.isEmpty ? testBaseAddress : normalized
     }
 
     /**
@@ -286,4 +304,14 @@ private enum Verb: String {
     case POST
     case PUT
     case DELETE
+}
+
+private extension String {
+    func trimmingTrailingSlashes() -> String {
+        var value = self
+        while value.hasSuffix("/") {
+            value.removeLast()
+        }
+        return value
+    }
 }

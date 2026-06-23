@@ -2,6 +2,12 @@ import Foundation
 import XCTest
 @testable import WeBirr
 
+#if os(Linux)
+import Glibc
+#else
+import Darwin
+#endif
+
 final class WeBirrTests: XCTestCase {
     private let exampleCursor = "20251231"
 
@@ -44,6 +50,50 @@ final class WeBirrTests: XCTestCase {
         XCTAssertEqual(response.res, "OK")
         XCTAssertEqual(session.requests.count, 1)
         XCTAssertEqual(query(session.requests[0])["merchant_id"], "merchant-from-client")
+    }
+
+    func testTestEnvDefaultsToApiWebirrDev() {
+        unsetenv("GATEWAY_URL")
+        let session = MockURLSession()
+        let api = testClient(session: session)
+
+        let _: ApiResponse<String> = waitForResponse { done in
+            api.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
+        }
+
+        XCTAssertEqual(session.requests[0].url?.scheme, "https")
+        XCTAssertEqual(session.requests[0].url?.host, "api.webirr.dev")
+        XCTAssertNil(session.requests[0].url?.port)
+    }
+
+    func testGatewayUrlOverridesTestEnvOnly() {
+        setenv("GATEWAY_URL", "http://127.0.0.1:9999/", 1)
+        defer { unsetenv("GATEWAY_URL") }
+
+        let testSession = MockURLSession()
+        let testApi = testClient(session: testSession)
+        let _: ApiResponse<String> = waitForResponse { done in
+            testApi.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
+        }
+
+        XCTAssertEqual(testSession.requests[0].url?.scheme, "http")
+        XCTAssertEqual(testSession.requests[0].url?.host, "127.0.0.1")
+        XCTAssertEqual(testSession.requests[0].url?.port, 9999)
+
+        let prodSession = MockURLSession()
+        let prodApi = WeBirrClient(
+            merchantId: "merchant-from-client",
+            apiKey: "api-key",
+            isTestEnv: false,
+            urlSession: prodSession
+        )
+        let _: ApiResponse<String> = waitForResponse { done in
+            prodApi.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
+        }
+
+        XCTAssertEqual(prodSession.requests[0].url?.scheme, "https")
+        XCTAssertEqual(prodSession.requests[0].url?.host, "api.webirr.net")
+        XCTAssertEqual(prodSession.requests[0].url?.port, 8080)
     }
 
     func testEndpointRequestsIncludeMerchantIdWhenConfigured() {
