@@ -194,9 +194,7 @@ public final class WeBirrClient {
 
     private func prepareBill(_ bill: Bill) -> Bill {
         var prepared = bill
-        if !merchantId.isEmpty {
-            prepared.merchantID = merchantId
-        }
+        prepared.merchantID = merchantId
         return prepared
     }
 
@@ -276,11 +274,10 @@ public final class WeBirrClient {
 
     private func buildURL(path: String, query: [String: String]) -> URL? {
         var components = URLComponents(string: "\(baseAddress)\(path)")
-        var queryItems = [URLQueryItem(name: "api_key", value: apiKey)]
-
-        if !merchantId.isEmpty {
-            queryItems.append(URLQueryItem(name: "merchant_id", value: merchantId))
-        }
+        var queryItems = [
+            URLQueryItem(name: "api_key", value: apiKey),
+            URLQueryItem(name: "merchant_id", value: merchantId)
+        ]
 
         for key in query.keys.sorted() {
             queryItems.append(URLQueryItem(name: key, value: query[key]))
