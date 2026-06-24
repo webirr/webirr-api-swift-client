@@ -25,7 +25,7 @@ final class WeBirrTests: XCTestCase {
         XCTAssertEqual(body["merchantID"] as? String, "merchant-from-client")
     }
 
-    func testEmptyMerchantIdDoesNotOverwriteExistingBillMerchantId() {
+    func testEmptyMerchantIdOverwritesExistingBillMerchantId() {
         let session = MockURLSession()
         let api = emptyMerchantTestClient(session: session)
         var bill = sampleBill()
@@ -36,7 +36,7 @@ final class WeBirrTests: XCTestCase {
         }
 
         let body = decodeBody(session.requests[0])
-        XCTAssertEqual(body["merchantID"] as? String, "merchant-on-bill")
+        XCTAssertEqual(body["merchantID"] as? String, "")
     }
 
     func testInjectedURLSessionIsUsedForRequests() {
@@ -116,14 +116,14 @@ final class WeBirrTests: XCTestCase {
         }
     }
 
-    func testEndpointRequestsOmitMerchantIdWhenClientMerchantIdIsEmpty() {
+    func testEndpointRequestsIncludeEmptyMerchantIdWhenClientMerchantIdIsEmpty() {
         for endpoint in endpointCalls() {
             let session = MockURLSession()
             let api = emptyMerchantTestClient(session: session)
 
             waitForEndpoint(endpoint, api: api)
 
-            XCTAssertNil(query(session.requests[0])["merchant_id"], endpoint.name)
+            XCTAssertEqual(query(session.requests[0])["merchant_id"], "", endpoint.name)
         }
     }
 
