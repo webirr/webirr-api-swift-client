@@ -37,14 +37,6 @@ public final class WeBirrClient {
     private let baseAddress: String
     private let urlSession: WeBirrURLSession
 
-    public convenience init(apiKey: String, isTestEnv: Bool) {
-        self.init(merchantId: "", apiKey: apiKey, isTestEnv: isTestEnv)
-    }
-
-    public convenience init(apiKey: String, isTestEnv: Bool, urlSession: WeBirrURLSession) {
-        self.init(merchantId: "", apiKey: apiKey, isTestEnv: isTestEnv, urlSession: urlSession)
-    }
-
     public init(
         merchantId: String,
         apiKey: String,

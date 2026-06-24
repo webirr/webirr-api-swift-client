@@ -25,9 +25,9 @@ final class WeBirrTests: XCTestCase {
         XCTAssertEqual(body["merchantID"] as? String, "merchant-from-client")
     }
 
-    func testLegacyConstructorDoesNotOverwriteExistingBillMerchantId() {
+    func testEmptyMerchantIdDoesNotOverwriteExistingBillMerchantId() {
         let session = MockURLSession()
-        let api = legacyTestClient(session: session)
+        let api = emptyMerchantTestClient(session: session)
         var bill = sampleBill()
         bill.merchantID = "merchant-on-bill"
 
@@ -119,7 +119,7 @@ final class WeBirrTests: XCTestCase {
     func testEndpointRequestsOmitMerchantIdWhenClientMerchantIdIsEmpty() {
         for endpoint in endpointCalls() {
             let session = MockURLSession()
-            let api = legacyTestClient(session: session)
+            let api = emptyMerchantTestClient(session: session)
 
             waitForEndpoint(endpoint, api: api)
 
@@ -328,8 +328,8 @@ final class WeBirrTests: XCTestCase {
         )
     }
 
-    private func legacyTestClient(session: MockURLSession) -> WeBirrClient {
-        WeBirrClient(apiKey: "api-key", isTestEnv: true, urlSession: session)
+    private func emptyMerchantTestClient(session: MockURLSession) -> WeBirrClient {
+        WeBirrClient(merchantId: "", apiKey: "api-key", isTestEnv: true, urlSession: session)
     }
 
     private func sampleBill() -> Bill {
