@@ -430,28 +430,6 @@ The `Examples/Example/main.swift` file includes workflows equivalent to the READ
 | `getBillAndListBills` | Get bill by reference, get bill by payment code, list bills. |
 | `getSupportedBanks` | Get banks enabled for the configured merchant checkout. |
 
-## Error handling & retries
-
-Async APIs return `ApiResponse<T>` when the gateway returns a successful HTTP response. WeBirr business errors come back in `ApiResponse.error` / `ApiResponse.errorCode`; network/DNS/TLS failures, `URLError.timedOut`, non-2xx HTTP, and empty or non-JSON 2xx bodies are thrown platform errors, not `ApiResponse`.
-
-```swift
-do {
-    let createResponse = try await api.createBill(bill: bill)
-    guard createResponse.error == nil else {
-        // WeBirr business error: createResponse.error / createResponse.errorCode.
-        return
-    }
-
-    print("Payment Code = \(createResponse.res ?? "")")
-} catch {
-    if WeBirrErrors.isTransient(error) {
-        // Retry only transient failures such as transport errors, timeouts, 5xx, 429, or 408.
-    }
-}
-```
-
-Use `WeBirrErrors.isTransient(error)` before retrying platform failures with exponential backoff + jitter. Never retry other 4xx responses. Create and read operations are safe to retry. `DeleteBill` is also safe to retry, but a retry after it already succeeded returns an "invalid payment code" error; treat that as already-deleted.
-
 ## Tests
 
 Fast tests use a mock URL session:
@@ -471,3 +449,31 @@ swift test
 ## Backward Compatibility
 
 In 2.x, the client constructor requires the merchant ID argument. The client sends `merchant_id` on every request and sets `Bill.merchantID` from the client value before create/update calls.
+
+## Error handling & retries
+
+Async APIs return `ApiResponse<T>` when the gateway returns a successful HTTP response. WeBirr business errors come back in `ApiResponse.error` / `ApiResponse.errorCode`; network/DNS/TLS failures, `URLError.timedOut`, non-2xx HTTP, and empty or non-JSON 2xx bodies are thrown platform errors, not `ApiResponse`.
+
+```swift
+do {
+    let createResponse = try await api.createBill(bill: bill)
+    guard createResponse.error == nil else {
+        // WeBirr business error: createResponse.error / createResponse.errorCode.
+        return
+    }
+
+    print("Payment Code = \(createResponse.res ?? "")")
+} catch {
+    if TransientErrors.isTransient(error) {
+        // Transient platform error: transport/network failure,
+        // timeout, HTTP 5xx, 429, or 408.
+        // Safe to retry with backoff + jitter.
+    } else {
+        // Non-transient platform error: HTTP 4xx other than 408/429,
+        // invalid/empty response body, JSON parsing error, or caller cancellation.
+        // Do not retry automatically.
+    }
+}
+```
+
+Use `TransientErrors.isTransient(error)` before retrying platform failures with exponential backoff + jitter. Never retry other 4xx responses. Create and read operations are safe to retry. `DeleteBill` is also safe to retry, but a retry after it already succeeded returns an "invalid payment code" error; treat that as already-deleted.

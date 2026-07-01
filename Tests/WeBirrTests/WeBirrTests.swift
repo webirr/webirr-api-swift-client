@@ -217,7 +217,7 @@ final class WeBirrTests: XCTestCase {
             return XCTFail("expected WeBirrPlatformError.httpStatus")
         }
         XCTAssertEqual(statusCode, 503)
-        XCTAssertTrue(WeBirrErrors.isTransient(error))
+        XCTAssertTrue(TransientErrors.isTransient(error))
     }
 
     func testEmpty2xxBodyReturnsFailure() {
@@ -247,7 +247,7 @@ final class WeBirrTests: XCTestCase {
             return XCTFail("expected URLError")
         }
         XCTAssertEqual(error.code, .timedOut)
-        XCTAssertTrue(WeBirrErrors.isTransient(error))
+        XCTAssertTrue(TransientErrors.isTransient(error))
     }
 
     func testLiveTestEnvSmokeAllEndpoints() throws {

@@ -29,7 +29,7 @@ public enum WeBirrPlatformError: Error, Equatable {
     case httpStatus(statusCode: Int, status: String)
 }
 
-public enum WeBirrErrors {
+public enum TransientErrors {
     public static func isTransient(_ error: Error) -> Bool {
         if let platformError = error as? WeBirrPlatformError {
             switch platformError {
