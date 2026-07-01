@@ -17,9 +17,7 @@ final class WeBirrTests: XCTestCase {
         var bill = sampleBill()
         bill.merchantID = "merchant-on-bill"
 
-        let _: ApiResponse<String> = waitForResponse { done in
-            api.createBillAsync(bill: bill, callBack: done)
-        }
+        let _: ApiResponse<String> = waitForResponse { try await api.createBill(bill: bill) }
 
         let body = decodeBody(session.requests[0])
         XCTAssertEqual(body["merchantID"] as? String, "merchant-from-client")
@@ -31,9 +29,7 @@ final class WeBirrTests: XCTestCase {
         var bill = sampleBill()
         bill.merchantID = "merchant-on-bill"
 
-        let _: ApiResponse<String> = waitForResponse { done in
-            api.createBillAsync(bill: bill, callBack: done)
-        }
+        let _: ApiResponse<String> = waitForResponse { try await api.createBill(bill: bill) }
 
         let body = decodeBody(session.requests[0])
         XCTAssertEqual(body["merchantID"] as? String, "")
@@ -43,9 +39,7 @@ final class WeBirrTests: XCTestCase {
         let session = MockURLSession()
         let api = testClient(session: session)
 
-        let response: ApiResponse<String> = waitForResponse { done in
-            api.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
-        }
+        let response: ApiResponse<String> = waitForResponse { try await api.deleteBill(paymentCode: "123 456 789") }
 
         XCTAssertEqual(response.res, "OK")
         XCTAssertEqual(session.requests.count, 1)
@@ -57,9 +51,7 @@ final class WeBirrTests: XCTestCase {
         let session = MockURLSession()
         let api = testClient(session: session)
 
-        let _: ApiResponse<String> = waitForResponse { done in
-            api.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
-        }
+        let _: ApiResponse<String> = waitForResponse { try await api.deleteBill(paymentCode: "123 456 789") }
 
         XCTAssertEqual(session.requests[0].url?.scheme, "https")
         XCTAssertEqual(session.requests[0].url?.host, "api.webirr.dev")
@@ -72,9 +64,7 @@ final class WeBirrTests: XCTestCase {
 
         let testSession = MockURLSession()
         let testApi = testClient(session: testSession)
-        let _: ApiResponse<String> = waitForResponse { done in
-            testApi.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
-        }
+        let _: ApiResponse<String> = waitForResponse { try await testApi.deleteBill(paymentCode: "123 456 789") }
 
         XCTAssertEqual(testSession.requests[0].url?.scheme, "http")
         XCTAssertEqual(testSession.requests[0].url?.host, "127.0.0.1")
@@ -87,9 +77,7 @@ final class WeBirrTests: XCTestCase {
             isTestEnv: false,
             urlSession: prodSession
         )
-        let _: ApiResponse<String> = waitForResponse { done in
-            prodApi.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
-        }
+        let _: ApiResponse<String> = waitForResponse { try await prodApi.deleteBill(paymentCode: "123 456 789") }
 
         XCTAssertEqual(prodSession.requests[0].url?.scheme, "https")
         XCTAssertEqual(prodSession.requests[0].url?.host, "api.webirr.net")
@@ -216,6 +204,52 @@ final class WeBirrTests: XCTestCase {
         }
     }
 
+    func testNon2xxHTTPReturnsFailureWithStatus() {
+        let session = MockURLSession(response: successData(), statusCode: 503)
+        let api = testClient(session: session)
+
+        let result: Result<ApiResponse<String>, Error> = waitForResult {
+            try await api.deleteBill(paymentCode: "123 456 789")
+        }
+
+        guard case let .failure(error) = result,
+              case let WeBirrPlatformError.httpStatus(statusCode, _) = error else {
+            return XCTFail("expected WeBirrPlatformError.httpStatus")
+        }
+        XCTAssertEqual(statusCode, 503)
+        XCTAssertTrue(WeBirrErrors.isTransient(error))
+    }
+
+    func testEmpty2xxBodyReturnsFailure() {
+        let session = MockURLSession(response: Data(), statusCode: 200)
+        let api = testClient(session: session)
+
+        let result: Result<ApiResponse<String>, Error> = waitForResult {
+            try await api.deleteBill(paymentCode: "123 456 789")
+        }
+
+        guard case let .failure(error) = result,
+              case let WeBirrPlatformError.emptyResponse(statusCode) = error else {
+            return XCTFail("expected WeBirrPlatformError.emptyResponse")
+        }
+        XCTAssertEqual(statusCode, 200)
+    }
+
+    func testURLSessionErrorReturnsFailure() {
+        let session = MockURLSession(response: nil, error: URLError(.timedOut))
+        let api = testClient(session: session)
+
+        let result: Result<ApiResponse<String>, Error> = waitForResult {
+            try await api.deleteBill(paymentCode: "123 456 789")
+        }
+
+        guard case let .failure(error as URLError) = result else {
+            return XCTFail("expected URLError")
+        }
+        XCTAssertEqual(error.code, .timedOut)
+        XCTAssertTrue(WeBirrErrors.isTransient(error))
+    }
+
     func testLiveTestEnvSmokeAllEndpoints() throws {
         let env = ProcessInfo.processInfo.environment
         let merchantId = env["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? ""
@@ -232,15 +266,11 @@ final class WeBirrTests: XCTestCase {
 
         defer {
             if !paymentCode.isEmpty && !billDeleted {
-                let _: ApiResponse<String> = waitForResponse { done in
-                    api.deleteBillAsync(paymentCode: paymentCode, callBack: done)
-                }
+                let _: ApiResponse<String> = waitForResponse { try await api.deleteBill(paymentCode: paymentCode) }
             }
         }
 
-        let createResponse: ApiResponse<String> = waitForResponse { done in
-            api.createBillAsync(bill: liveSampleBill(billReference), callBack: done)
-        }
+        let createResponse: ApiResponse<String> = waitForResponse { try await api.createBill(bill: self.liveSampleBill(billReference)) }
         assertNoApiError(createResponse, "createBill")
         paymentCode = createResponse.res ?? ""
         XCTAssertFalse(paymentCode.isEmpty)
@@ -248,57 +278,41 @@ final class WeBirrTests: XCTestCase {
 
         var updatedBill = liveSampleBill(billReference)
         updatedBill.amount = "278.00"
-        let updateResponse: ApiResponse<String> = waitForResponse { done in
-            api.updateBillAsync(bill: updatedBill, callBack: done)
-        }
+        let updateResponse: ApiResponse<String> = waitForResponse { try await api.updateBill(bill: updatedBill) }
         assertNoApiError(updateResponse, "updateBill")
         XCTAssertEqual(updateResponse.res?.lowercased(), "ok")
 
-        let statusResponse: ApiResponse<Payment> = waitForResponse { done in
-            api.getPaymentStatusAsync(paymentCode: paymentCode, callBack: done)
-        }
+        let statusResponse: ApiResponse<Payment> = waitForResponse { try await api.getPaymentStatus(paymentCode: paymentCode) }
         assertNoApiError(statusResponse, "getPaymentStatus")
         XCTAssertEqual(statusResponse.res?.status, 0)
         XCTAssertNil(statusResponse.res?.data)
 
-        let byReference: ApiResponse<BillResponse> = waitForResponse { done in
-            api.getBillByReferenceAsync(billReference: billReference, callBack: done)
-        }
+        let byReference: ApiResponse<BillResponse> = waitForResponse { try await api.getBillByReference(billReference: billReference) }
         assertNoApiError(byReference, "getBillByReference")
         assertCreatedBill(byReference.res, billReference, merchantId, paymentCode)
         XCTAssertEqual(Double(byReference.res?.amount ?? "") ?? 0, 278, accuracy: 0.01)
         let listCursor = cursorBefore(byReference.res?.updateTimeStamp ?? "", fallback: exampleCursor)
 
-        let byPaymentCode: ApiResponse<BillResponse> = waitForResponse { done in
-            api.getBillByPaymentCodeAsync(paymentCode: paymentCode, callBack: done)
-        }
+        let byPaymentCode: ApiResponse<BillResponse> = waitForResponse { try await api.getBillByPaymentCode(paymentCode: paymentCode) }
         assertNoApiError(byPaymentCode, "getBillByPaymentCode")
         assertCreatedBill(byPaymentCode.res, billReference, merchantId, paymentCode)
 
-        let bills: ApiResponse<[BillResponse]> = waitForResponse { done in
-            api.getBillsAsync(paymentStatus: 0, lastTimeStamp: listCursor, limit: 100, callBack: done)
-        }
+        let bills: ApiResponse<[BillResponse]> = waitForResponse { try await api.getBills(paymentStatus: 0, lastTimeStamp: listCursor, limit: 100) }
         assertNoApiError(bills, "getBills")
         let foundBill = bills.res?.first {
             $0.billReference.lowercased() == billReference.lowercased()
         }
         assertCreatedBill(foundBill, billReference, merchantId, paymentCode)
 
-        let payments: ApiResponse<[PaymentResponse]> = waitForResponse { done in
-            api.getPaymentsAsync(lastTimeStamp: exampleCursor, limit: 10, callBack: done)
-        }
+        let payments: ApiResponse<[PaymentResponse]> = waitForResponse { try await api.getPayments(lastTimeStamp: self.exampleCursor, limit: 10) }
         assertNoApiError(payments, "getPayments")
         XCTAssertNotNil(payments.res)
 
-        let stat: ApiResponse<Stat> = waitForResponse { done in
-            api.getStatAsync(dateFrom: "2025-01-01", dateTo: "2030-01-31", callBack: done)
-        }
+        let stat: ApiResponse<Stat> = waitForResponse { try await api.getStat(dateFrom: "2025-01-01", dateTo: "2030-01-31") }
         assertNoApiError(stat, "getStat")
         XCTAssertNotNil(stat.res)
 
-        let supportedBanks: ApiResponse<[SupportedBank]> = waitForResponse { done in
-            api.getSupportedBanksAsync(callBack: done)
-        }
+        let supportedBanks: ApiResponse<[SupportedBank]> = waitForResponse { try await api.getSupportedBanks() }
         assertNoApiError(supportedBanks, "getSupportedBanks")
         XCTAssertFalse(supportedBanks.res?.isEmpty ?? true)
         for bank in supportedBanks.res ?? [] {
@@ -306,16 +320,12 @@ final class WeBirrTests: XCTestCase {
             XCTAssertFalse(bank.name.isEmpty)
         }
 
-        let deleteResponse: ApiResponse<String> = waitForResponse { done in
-            api.deleteBillAsync(paymentCode: paymentCode, callBack: done)
-        }
+        let deleteResponse: ApiResponse<String> = waitForResponse { try await api.deleteBill(paymentCode: paymentCode) }
         assertNoApiError(deleteResponse, "deleteBill")
         XCTAssertEqual(deleteResponse.res?.lowercased(), "ok")
         billDeleted = true
 
-        let deletedLookup: ApiResponse<BillResponse> = waitForResponse { done in
-            api.getBillByReferenceAsync(billReference: billReference, callBack: done)
-        }
+        let deletedLookup: ApiResponse<BillResponse> = waitForResponse { try await api.getBillByReference(billReference: billReference) }
         XCTAssertNotNil(deletedLookup.error)
     }
 
@@ -360,32 +370,38 @@ final class WeBirrTests: XCTestCase {
     }
 
     private func waitForResponse<T: Codable>(
-        _ operation: (@escaping (ApiResponse<T>) -> Void) -> Void
+        _ operation: @escaping () async throws -> ApiResponse<T>
     ) -> ApiResponse<T> {
-        let expectation = expectation(description: "response")
-        var result: ApiResponse<T>?
+        switch waitForResult(operation) {
+        case let .success(response):
+            return response
+        case let .failure(error):
+            return ApiResponse(error: "test failure \(error)")
+        }
+    }
 
-        operation { response in
-            result = response
+    private func waitForResult<T: Codable>(
+        _ operation: @escaping () async throws -> ApiResponse<T>
+    ) -> Result<ApiResponse<T>, Error> {
+        let expectation = expectation(description: "response")
+        var result: Result<ApiResponse<T>, Error>?
+
+        Task {
+            do {
+                result = .success(try await operation())
+            } catch {
+                result = .failure(error)
+            }
             expectation.fulfill()
         }
 
         wait(for: [expectation], timeout: 15)
-        return result ?? ApiResponse(error: "test timeout")
+        return result ?? .failure(WeBirrPlatformError.emptyResponse(statusCode: 0))
     }
 
     @discardableResult
     private func waitForEndpoint(_ endpoint: EndpointCall, api: WeBirrClient) -> ApiResponse<String> {
-        let expectation = expectation(description: endpoint.name)
-        var response = ApiResponse<String>()
-
-        endpoint.invoke(api) { endpointResponse in
-            response = endpointResponse
-            expectation.fulfill()
-        }
-
-        wait(for: [expectation], timeout: 5)
-        return response
+        waitForResponse { try await endpoint.invoke(api) }
     }
 
     private func endpointCalls() -> [EndpointCall] {
@@ -395,8 +411,8 @@ final class WeBirrTests: XCTestCase {
                 method: "POST",
                 path: "/einvoice/api/bill",
                 expectedQuery: [:],
-                invoke: { api, done in
-                    api.createBillAsync(bill: self.sampleBill()) { response in done(response.asStringResponse()) }
+                invoke: { api in
+                    try await api.createBill(bill: self.sampleBill()).asStringResponse()
                 }
             ),
             EndpointCall(
@@ -404,8 +420,8 @@ final class WeBirrTests: XCTestCase {
                 method: "PUT",
                 path: "/einvoice/api/bill",
                 expectedQuery: [:],
-                invoke: { api, done in
-                    api.updateBillAsync(bill: self.sampleBill()) { response in done(response.asStringResponse()) }
+                invoke: { api in
+                    try await api.updateBill(bill: self.sampleBill()).asStringResponse()
                 }
             ),
             EndpointCall(
@@ -413,8 +429,8 @@ final class WeBirrTests: XCTestCase {
                 method: "DELETE",
                 path: "/einvoice/api/bill",
                 expectedQuery: ["wbc_code": "123 456 789"],
-                invoke: { api, done in
-                    api.deleteBillAsync(paymentCode: "123 456 789", callBack: done)
+                invoke: { api in
+                    try await api.deleteBill(paymentCode: "123 456 789")
                 }
             ),
             EndpointCall(
@@ -422,8 +438,8 @@ final class WeBirrTests: XCTestCase {
                 method: "GET",
                 path: "/einvoice/api/paymentStatus",
                 expectedQuery: ["wbc_code": "123 456 789"],
-                invoke: { api, done in
-                    api.getPaymentStatusAsync(paymentCode: "123 456 789") { response in done(response.asStringResponse()) }
+                invoke: { api in
+                    try await api.getPaymentStatus(paymentCode: "123 456 789").asStringResponse()
                 }
             ),
             EndpointCall(
@@ -431,8 +447,8 @@ final class WeBirrTests: XCTestCase {
                 method: "GET",
                 path: "/einvoice/api/bill",
                 expectedQuery: ["bill_reference": "swift/unit/1"],
-                invoke: { api, done in
-                    api.getBillByReferenceAsync(billReference: "swift/unit/1") { response in done(response.asStringResponse()) }
+                invoke: { api in
+                    try await api.getBillByReference(billReference: "swift/unit/1").asStringResponse()
                 }
             ),
             EndpointCall(
@@ -440,8 +456,8 @@ final class WeBirrTests: XCTestCase {
                 method: "GET",
                 path: "/einvoice/api/bill",
                 expectedQuery: ["wbc_code": "123 456 789"],
-                invoke: { api, done in
-                    api.getBillByPaymentCodeAsync(paymentCode: "123 456 789") { response in done(response.asStringResponse()) }
+                invoke: { api in
+                    try await api.getBillByPaymentCode(paymentCode: "123 456 789").asStringResponse()
                 }
             ),
             EndpointCall(
@@ -453,10 +469,8 @@ final class WeBirrTests: XCTestCase {
                     "last_timestamp": exampleCursor,
                     "limit": "10"
                 ],
-                invoke: { api, done in
-                    api.getBillsAsync(paymentStatus: -1, lastTimeStamp: self.exampleCursor, limit: 10) { response in
-                        done(response.asStringResponse())
-                    }
+                invoke: { api in
+                    try await api.getBills(paymentStatus: -1, lastTimeStamp: self.exampleCursor, limit: 10).asStringResponse()
                 }
             ),
             EndpointCall(
@@ -467,10 +481,8 @@ final class WeBirrTests: XCTestCase {
                     "last_timestamp": exampleCursor,
                     "limit": "10"
                 ],
-                invoke: { api, done in
-                    api.getPaymentsAsync(lastTimeStamp: self.exampleCursor, limit: 10) { response in
-                        done(response.asStringResponse())
-                    }
+                invoke: { api in
+                    try await api.getPayments(lastTimeStamp: self.exampleCursor, limit: 10).asStringResponse()
                 }
             ),
             EndpointCall(
@@ -481,10 +493,8 @@ final class WeBirrTests: XCTestCase {
                     "date_from": "2025-01-01",
                     "date_to": "2030-01-31"
                 ],
-                invoke: { api, done in
-                    api.getStatAsync(dateFrom: "2025-01-01", dateTo: "2030-01-31") { response in
-                        done(response.asStringResponse())
-                    }
+                invoke: { api in
+                    try await api.getStat(dateFrom: "2025-01-01", dateTo: "2030-01-31").asStringResponse()
                 }
             ),
             EndpointCall(
@@ -492,8 +502,8 @@ final class WeBirrTests: XCTestCase {
                 method: "GET",
                 path: "/einvoice/api/banks",
                 expectedQuery: [:],
-                invoke: { api, done in
-                    api.getSupportedBanksAsync { response in done(response.asStringResponse()) }
+                invoke: { api in
+                    try await api.getSupportedBanks().asStringResponse()
                 }
             )
         ]
@@ -638,14 +648,16 @@ private struct EndpointCall {
     let method: String
     let path: String
     let expectedQuery: [String: String]
-    let invoke: (WeBirrClient, @escaping (ApiResponse<String>) -> Void) -> Void
+    let invoke: (WeBirrClient) async throws -> ApiResponse<String>
 }
 
 private final class MockURLSession: WeBirrURLSession {
     var requests: [URLRequest] = []
-    private let response: Data
+    private let response: Data?
+    private let statusCode: Int
+    private let error: Error?
 
-    init(response: Data? = nil) {
+    init(response: Data? = nil, statusCode: Int = 200, error: Error? = nil) {
         if let response = response {
             self.response = response
         } else {
@@ -655,6 +667,8 @@ private final class MockURLSession: WeBirrURLSession {
                 "res": "OK"
             ])
         }
+        self.statusCode = statusCode
+        self.error = error
     }
 
     func dataTask(
@@ -665,11 +679,11 @@ private final class MockURLSession: WeBirrURLSession {
         return MockDataTask {
             let httpResponse = HTTPURLResponse(
                 url: request.url!,
-                statusCode: 200,
+                statusCode: self.statusCode,
                 httpVersion: nil,
                 headerFields: nil
             )
-            completionHandler(self.response, httpResponse, nil)
+            completionHandler(self.response, httpResponse, self.error)
         }
     }
 }

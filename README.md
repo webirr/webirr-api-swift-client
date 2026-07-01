@@ -54,7 +54,7 @@ import WeBirr
 let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
 let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
 
-func createAndUpdateBillAsync() {
+func createAndUpdateBill() async throws {
 
     let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
 
@@ -70,24 +70,16 @@ func createAndUpdateBillAsync() {
 
     print("Creating Bill...")
 
-    api.createBillAsync(bill: bill) { resp in
-
-        if resp.error == nil {
-            // success
-            let paymentCode = resp.res ?? "" // returns paymentcode such as 429 723 975
-            print("Payment Code = \(paymentCode)") // we may want to save payment code in local db.
-
-            //DispatchQueue.main.async {  updateUIShouldBeHere()! }
-
-        } else {
-            // fail
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")") // can be used to handle specific busines error such as ERROR_INVLAID_INPUT_DUP_REF
-        }
+    let created = try await api.createBill(bill: bill)
+    if created.error == nil {
+        // success
+        let paymentCode = created.res ?? "" // returns paymentcode such as 429 723 975
+        print("Payment Code = \(paymentCode)") // we may want to save payment code in local db.
+    } else {
+        // fail
+        print("error: \(created.error!)")
+        print("errorCode: \(created.errorCode ?? "")") // can be used to handle specific busines error such as ERROR_INVLAID_INPUT_DUP_REF
     }
-
-    // the above method call is async! will be ok in ios or anything that has ui runloop!
-    Thread.sleep(forTimeInterval: 2)
 
     // update existing bill if it is not paid
     bill.amount = "278.00"
@@ -96,17 +88,14 @@ func createAndUpdateBillAsync() {
 
     print("Updating Bill...")
 
-    api.updateBillAsync(bill: bill) { resp in
-
-        if resp.error == nil {
-            // success
-            print("bill is updated successfully")  //it.res will be 'OK'  no need to check here!
-
-        } else {
-            // fail
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")") // can be used to handle specific busines error such as ERROR_INVLAID_INPUT
-        }
+    let updated = try await api.updateBill(bill: bill)
+    if updated.error == nil {
+        // success
+        print("bill is updated successfully") //it.res will be 'OK'  no need to check here!
+    } else {
+        // fail
+        print("error: \(updated.error!)")
+        print("errorCode: \(updated.errorCode ?? "")") // can be used to handle specific busines error such as ERROR_INVLAID_INPUT
     }
 }
 ```
@@ -120,7 +109,7 @@ import WeBirr
 let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
 let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
 
-func getBillAndListBillsAsync() {
+func getBillAndListBills() async throws {
 
     let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
 
@@ -129,61 +118,51 @@ func getBillAndListBillsAsync() {
 
     print("Getting Bill By Reference...")
 
-    api.getBillByReferenceAsync(billReference: billReference) { resp in
-
-        if resp.error == nil {
-            // success
-            print("Payment Code = \(resp.res?.wbcCode ?? "")")
-            print("Payment Status = \(resp.res?.paymentStatus ?? 0)")
-            print("Last Timestamp = \(resp.res?.updateTimeStamp ?? "")")
-        } else {
-            // fail
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")")
-        }
+    let byReference = try await api.getBillByReference(billReference: billReference)
+    if byReference.error == nil {
+        // success
+        print("Payment Code = \(byReference.res?.wbcCode ?? "")")
+        print("Payment Status = \(byReference.res?.paymentStatus ?? 0)")
+        print("Last Timestamp = \(byReference.res?.updateTimeStamp ?? "")")
+    } else {
+        // fail
+        print("error: \(byReference.error!)")
+        print("errorCode: \(byReference.errorCode ?? "")")
     }
-
-    Thread.sleep(forTimeInterval: 2)
 
     print("Getting Bill By Payment Code...")
 
-    api.getBillByPaymentCodeAsync(paymentCode: paymentCode) { resp in
-
-        if resp.error == nil {
-            // success
-            print("Bill Reference = \(resp.res?.billReference ?? "")")
-            print("Payment Status = \(resp.res?.paymentStatus ?? 0)")
-            print("Last Timestamp = \(resp.res?.updateTimeStamp ?? "")")
-        } else {
-            // fail
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")")
-        }
+    let byPaymentCode = try await api.getBillByPaymentCode(paymentCode: paymentCode)
+    if byPaymentCode.error == nil {
+        // success
+        print("Bill Reference = \(byPaymentCode.res?.billReference ?? "")")
+        print("Payment Status = \(byPaymentCode.res?.paymentStatus ?? 0)")
+        print("Last Timestamp = \(byPaymentCode.res?.updateTimeStamp ?? "")")
+    } else {
+        // fail
+        print("error: \(byPaymentCode.error!)")
+        print("errorCode: \(byPaymentCode.errorCode ?? "")")
     }
-
-    Thread.sleep(forTimeInterval: 2)
 
     print("Listing Bills...")
     let paymentStatus = -1 // -1 all, 0 pending, 1 unconfirmed payment, 2 paid.
     let lastTimeStamp = "20251231" // Date-only cursor; use "20251231235959" when you need time precision.
     let limit = 10
 
-    api.getBillsAsync(paymentStatus: paymentStatus, lastTimeStamp: lastTimeStamp, limit: limit) { resp in
-
-        if resp.error == nil {
-            // success
-            print("Bills returned: \(resp.res?.count ?? 0)")
-            for bill in resp.res ?? [] {
-                print("Bill Reference = \(bill.billReference)")
-                print("Payment Code = \(bill.wbcCode)")
-                print("Payment Status = \(bill.paymentStatus)")
-                print("Last Timestamp = \(bill.updateTimeStamp)")
-            }
-        } else {
-            // fail
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")")
+    let bills = try await api.getBills(paymentStatus: paymentStatus, lastTimeStamp: lastTimeStamp, limit: limit)
+    if bills.error == nil {
+        // success
+        print("Bills returned: \(bills.res?.count ?? 0)")
+        for bill in bills.res ?? [] {
+            print("Bill Reference = \(bill.billReference)")
+            print("Payment Code = \(bill.wbcCode)")
+            print("Payment Status = \(bill.paymentStatus)")
+            print("Last Timestamp = \(bill.updateTimeStamp)")
         }
+    } else {
+        // fail
+        print("error: \(bills.error!)")
+        print("errorCode: \(bills.errorCode ?? "")")
     }
 }
 ```
@@ -197,26 +176,25 @@ import WeBirr
 let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
 let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
 
-func getSupportedBanksAsync() {
+func getSupportedBanks() async throws {
     let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
 
     print("Getting Supported Banks...")
 
-    api.getSupportedBanksAsync { resp in
-        if resp.error == nil {
-            for bank in resp.res ?? [] {
-                print("\(bank.bankID) - \(bank.name)")
-            }
-            print("Use only these merchant-specific banks when showing checkout payment instructions.")
-        } else {
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")")
+    let banks = try await api.getSupportedBanks()
+    if banks.error == nil {
+        for bank in banks.res ?? [] {
+            print("\(bank.bankID) - \(bank.name)")
         }
+        print("Use only these merchant-specific banks when showing checkout payment instructions.")
+    } else {
+        print("error: \(banks.error!)")
+        print("errorCode: \(banks.errorCode ?? "")")
     }
 }
 ```
 
-Checkout pages should render bank-specific instructions only from `getSupportedBanksAsync`. Do not show a broad static bank list unless those banks are returned for the configured merchant.
+Checkout pages should render bank-specific instructions only from `getSupportedBanks`. Do not show a broad static bank list unless those banks are returned for the configured merchant.
 
 ### Getting Payment status of an existing Bill from WeBirr Servers
 
@@ -227,34 +205,30 @@ import WeBirr
 let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
 let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
 
-func getPaymentStatusAsync() {
+func getPaymentStatus() async throws {
 
     let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
-
     let paymentCode = "PAYMENT_CODE_YOU_SAVED_AFTER_CREATING_A_NEW_BILL" // such as '141 263 782';
 
     print("Getting Payment Status...")
 
-    api.getPaymentStatusAsync(paymentCode: paymentCode) { resp in
-
-        if resp.error == nil {
-            // success
-            if resp.res?.isPaid ?? false {
-                print("bill is paid");
-                print("bill payment detail")
-                print("Bank: \(resp.res?.data?.bankID  ?? "")")
-                print("Bank Reference Number: \(resp.res?.data?.paymentReference  ?? "")")
-                print("Amount Paid: \(resp.res?.data?.amount  ?? "")")
-                print("Payment Date: \(resp.res?.data?.paymentDate  ?? "")")
-            } else {
-                print("bill is pending payment")
-            }
-
+    let status = try await api.getPaymentStatus(paymentCode: paymentCode)
+    if status.error == nil {
+        // success
+        if status.res?.isPaid ?? false {
+            print("bill is paid")
+            print("bill payment detail")
+            print("Bank: \(status.res?.data?.bankID  ?? "")")
+            print("Bank Reference Number: \(status.res?.data?.paymentReference  ?? "")")
+            print("Amount Paid: \(status.res?.data?.amount  ?? "")")
+            print("Payment Date: \(status.res?.data?.paymentDate  ?? "")")
         } else {
-            // fail
-            print("error: \(resp.error!)");
-            print("errorCode: \(resp.errorCode ?? "")"); // can be used to handle specific busines error such as ERROR_INVLAID_INPUT
+            print("bill is pending payment")
         }
+    } else {
+        // fail
+        print("error: \(status.error!)")
+        print("errorCode: \(status.errorCode ?? "")") // can be used to handle specific busines error such as ERROR_INVLAID_INPUT
     }
 }
 ```
@@ -288,24 +262,21 @@ import WeBirr
 let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
 let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
 
-func deleteBillAsync() {
+func deleteBill() async throws {
 
     let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
-
     let paymentCode = "PAYMENT_CODE_YOU_SAVED_AFTER_CREATING_A_NEW_BILL" // suchas as '141 263 782';
 
     print("Deleting Bill...")
 
-    api.deleteBillAsync(paymentCode: paymentCode) { resp in
-
-        if resp.error == nil {
-            // success
-            print("bill is deleted successfully"); //res.res will be 'OK'  no need to check here!
-        } else {
-            // fail
-            print("error: \(resp.error!)");
-            print("errorCode: \(resp.errorCode ?? "")"); // can be used to handle specific busines error such as ERROR_INVLAID_INPUT
-        }
+    let deleted = try await api.deleteBill(paymentCode: paymentCode)
+    if deleted.error == nil {
+        // success
+        print("bill is deleted successfully") //res.res will be 'OK'  no need to check here!
+    } else {
+        // fail
+        print("error: \(deleted.error!)")
+        print("errorCode: \(deleted.errorCode ?? "")") // can be used to handle specific busines error such as ERROR_INVLAID_INPUT
     }
 }
 ```
@@ -326,27 +297,25 @@ class BulkPaymentPollingConsumer {
         api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
     }
 
-    func fetchAndProcessPayments() {
+    func fetchAndProcessPayments() async throws {
         let limit = 100
 
         print("Getting Payments...")
 
-        api.getPaymentsAsync(lastTimeStamp: lastTimeStamp, limit: limit) { resp in
-
-            if resp.error == nil {
-                // success
-                for payment in resp.res ?? [] {
-                    self.processPayment(payment)
-                    if !payment.updateTimeStamp.isEmpty {
-                        self.lastTimeStamp = payment.updateTimeStamp
-                        print("Last Timestamp: \(self.lastTimeStamp)") // save updateTimeStamp to your database for the next getPaymentsAsync() call
-                    }
+        let payments = try await api.getPayments(lastTimeStamp: lastTimeStamp, limit: limit)
+        if payments.error == nil {
+            // success
+            for payment in payments.res ?? [] {
+                self.processPayment(payment)
+                if !payment.updateTimeStamp.isEmpty {
+                    self.lastTimeStamp = payment.updateTimeStamp
+                    print("Last Timestamp: \(self.lastTimeStamp)") // save updateTimeStamp to your database for the next getPayments() call
                 }
-            } else {
-                // fail
-                print("error: \(resp.error!)")
-                print("errorCode: \(resp.errorCode ?? "")")
             }
+        } else {
+            // fail
+            print("error: \(payments.error!)")
+            print("errorCode: \(payments.errorCode ?? "")")
         }
     }
 
@@ -420,7 +389,7 @@ import WeBirr
 let apiKey = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_API_KEY"] ?? "YOUR_API_KEY"
 let merchantId = ProcessInfo.processInfo.environment["WEBIRR_TEST_ENV_MERCHANT_ID"] ?? "YOUR_MERCHANT_ID"
 
-func getStatAsync() {
+func getStat() async throws {
 
     let api = WeBirr.WeBirrClient(merchantId: merchantId, apiKey: apiKey, isTestEnv: true)
 
@@ -429,21 +398,19 @@ func getStatAsync() {
 
     print("Getting Stat...")
 
-    api.getStatAsync(dateFrom: dateFrom, dateTo: dateTo) { resp in
-
-        if resp.error == nil {
-            // success
-            print("Bills Created: \(resp.res?.nBills ?? 0)")
-            print("Bills Paid: \(resp.res?.nBillsPaid ?? 0)")
-            print("Bills Unpaid: \(resp.res?.nBillsUnpaid ?? 0)")
-            print("Amount Bills: \(resp.res?.amountBills ?? 0)")
-            print("Amount Paid: \(resp.res?.amountPaid ?? 0)")
-            print("Amount Unpaid: \(resp.res?.amountUnpaid ?? 0)")
-        } else {
-            // fail
-            print("error: \(resp.error!)")
-            print("errorCode: \(resp.errorCode ?? "")")
-        }
+    let stat = try await api.getStat(dateFrom: dateFrom, dateTo: dateTo)
+    if stat.error == nil {
+        // success
+        print("Bills Created: \(stat.res?.nBills ?? 0)")
+        print("Bills Paid: \(stat.res?.nBillsPaid ?? 0)")
+        print("Bills Unpaid: \(stat.res?.nBillsUnpaid ?? 0)")
+        print("Amount Bills: \(stat.res?.amountBills ?? 0)")
+        print("Amount Paid: \(stat.res?.amountPaid ?? 0)")
+        print("Amount Unpaid: \(stat.res?.amountUnpaid ?? 0)")
+    } else {
+        // fail
+        print("error: \(stat.error!)")
+        print("errorCode: \(stat.errorCode ?? "")")
     }
 }
 ```
@@ -454,14 +421,36 @@ The `Examples/Example/main.swift` file includes workflows equivalent to the READ
 
 | Workflow | Coverage |
 | --- | --- |
-| `createAndUpdateBillAsync` | Create bill, save payment code, update same bill. |
-| `getPaymentStatusAsync` | Single payment status by saved payment code. |
-| `deleteBillAsync` | Delete unpaid bill by payment code. |
+| `createAndUpdateBill` | Create bill, save payment code, update same bill. |
+| `getPaymentStatus` | Single payment status by saved payment code. |
+| `deleteBill` | Delete unpaid bill by payment code. |
 | `fetchAndProcessPayments` | Poll payments with `lastTimeStamp`, process each payment, save `updateTimeStamp`. |
-| `getStatAsync` | Merchant stats by date range. |
+| `getStat` | Merchant stats by date range. |
 | `processWebhookPayment` | Webhook callback processing helper. |
-| `getBillAndListBillsAsync` | Get bill by reference, get bill by payment code, list bills. |
-| `getSupportedBanksAsync` | Get banks enabled for the configured merchant checkout. |
+| `getBillAndListBills` | Get bill by reference, get bill by payment code, list bills. |
+| `getSupportedBanks` | Get banks enabled for the configured merchant checkout. |
+
+## Error handling & retries
+
+Async APIs return `ApiResponse<T>` when the gateway returns a successful HTTP response. WeBirr business errors come back in `ApiResponse.error` / `ApiResponse.errorCode`; network/DNS/TLS failures, `URLError.timedOut`, non-2xx HTTP, and empty or non-JSON 2xx bodies are thrown platform errors, not `ApiResponse`.
+
+```swift
+do {
+    let createResponse = try await api.createBill(bill: bill)
+    guard createResponse.error == nil else {
+        // WeBirr business error: createResponse.error / createResponse.errorCode.
+        return
+    }
+
+    print("Payment Code = \(createResponse.res ?? "")")
+} catch {
+    if WeBirrErrors.isTransient(error) {
+        // Retry only transient failures such as transport errors, timeouts, 5xx, 429, or 408.
+    }
+}
+```
+
+Use `WeBirrErrors.isTransient(error)` before retrying platform failures with exponential backoff + jitter. Never retry other 4xx responses. Create and read operations are safe to retry. `DeleteBill` is also safe to retry, but a retry after it already succeeded returns an "invalid payment code" error; treat that as already-deleted.
 
 ## Tests
 

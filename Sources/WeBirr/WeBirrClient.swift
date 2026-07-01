@@ -22,6 +22,38 @@ extension URLSession: WeBirrURLSession {
     }
 }
 
+public enum WeBirrPlatformError: Error, Equatable {
+    case invalidURL
+    case invalidHTTPResponse
+    case emptyResponse(statusCode: Int)
+    case httpStatus(statusCode: Int, status: String)
+}
+
+public enum WeBirrErrors {
+    public static func isTransient(_ error: Error) -> Bool {
+        if let platformError = error as? WeBirrPlatformError {
+            switch platformError {
+            case let .httpStatus(statusCode, _):
+                return statusCode >= 500 || statusCode == 429 || statusCode == 408
+            case .invalidURL, .invalidHTTPResponse, .emptyResponse:
+                return false
+            }
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed,
+                 .networkConnectionLost, .notConnectedToInternet, .secureConnectionFailed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        return false
+    }
+}
+
 /**
  * A WeBirrClient instance object can be used to
  * Create, Update or Delete a Bill at WeBirr Servers and also to
@@ -69,8 +101,8 @@ public final class WeBirrClient {
      * Check if(ApiResponse.error == nil) to see if there are errors.
      * ApiResponse.res will have the value of the returned PaymentCode on success.
      */
-    public func createBillAsync(bill: Bill, callBack: @escaping (ApiResponse<String>) -> Void) {
-        request(.POST, path: "/einvoice/api/bill", body: prepareBill(bill), callBack: callBack)
+    public func createBill(bill: Bill) async throws -> ApiResponse<String> {
+        try await request(.POST, path: "/einvoice/api/bill", body: prepareBill(bill))
     }
 
     /**
@@ -79,116 +111,97 @@ public final class WeBirrClient {
      * Check if(ApiResponse.error == nil) to see if there are errors.
      * ApiResponse.res will have the value of "OK" on success.
      */
-    public func updateBillAsync(bill: Bill, callBack: @escaping (ApiResponse<String>) -> Void) {
-        request(.PUT, path: "/einvoice/api/bill", body: prepareBill(bill), callBack: callBack)
+    public func updateBill(bill: Bill) async throws -> ApiResponse<String> {
+        try await request(.PUT, path: "/einvoice/api/bill", body: prepareBill(bill))
     }
 
     /**
      * Delete an existing bill at WeBirr Servers, if the bill is not paid yet.
-     * paymentCode is the number that WeBirr Payment Gateway returns on createBillAsync.
+     * paymentCode is the number that WeBirr Payment Gateway returns on createBill.
      */
-    public func deleteBillAsync(paymentCode: String, callBack: @escaping (ApiResponse<String>) -> Void) {
-        request(
+    public func deleteBill(paymentCode: String) async throws -> ApiResponse<String> {
+        try await request(
             .DELETE,
             path: "/einvoice/api/bill",
-            query: ["wbc_code": paymentCode],
-            callBack: callBack
+            query: ["wbc_code": paymentCode]
         )
     }
 
     /**
      * Get Payment Status of a bill from WeBirr Servers.
      */
-    public func getPaymentStatusAsync(paymentCode: String, callBack: @escaping (ApiResponse<Payment>) -> Void) {
-        request(
+    public func getPaymentStatus(paymentCode: String) async throws -> ApiResponse<Payment> {
+        try await request(
             .GET,
             path: "/einvoice/api/paymentStatus",
-            query: ["wbc_code": paymentCode],
-            callBack: callBack
+            query: ["wbc_code": paymentCode]
         )
     }
 
-    public func getBillByReferenceAsync(
-        billReference: String,
-        callBack: @escaping (ApiResponse<BillResponse>) -> Void
-    ) {
-        request(
+    public func getBillByReference(billReference: String) async throws -> ApiResponse<BillResponse> {
+        try await request(
             .GET,
             path: "/einvoice/api/bill",
-            query: ["bill_reference": billReference],
-            callBack: callBack
+            query: ["bill_reference": billReference]
         )
     }
 
-    public func getBillByPaymentCodeAsync(
-        paymentCode: String,
-        callBack: @escaping (ApiResponse<BillResponse>) -> Void
-    ) {
-        request(
+    public func getBillByPaymentCode(paymentCode: String) async throws -> ApiResponse<BillResponse> {
+        try await request(
             .GET,
             path: "/einvoice/api/bill",
-            query: ["wbc_code": paymentCode],
-            callBack: callBack
+            query: ["wbc_code": paymentCode]
         )
     }
 
-    public func getBillsAsync(
+    public func getBills(
         paymentStatus: Int = -1,
         lastTimeStamp: String = "",
-        limit: Int = 100,
-        callBack: @escaping (ApiResponse<[BillResponse]>) -> Void
-    ) {
-        request(
+        limit: Int = 100
+    ) async throws -> ApiResponse<[BillResponse]> {
+        try await request(
             .GET,
             path: "/einvoice/api/bills",
             query: [
                 "payment_status": String(paymentStatus),
                 "last_timestamp": lastTimeStamp,
                 "limit": String(limit)
-            ],
-            callBack: callBack
+            ]
         )
     }
 
-    public func getPaymentsAsync(
+    public func getPayments(
         lastTimeStamp: String = "",
-        limit: Int = 100,
-        callBack: @escaping (ApiResponse<[PaymentResponse]>) -> Void
-    ) {
-        request(
+        limit: Int = 100
+    ) async throws -> ApiResponse<[PaymentResponse]> {
+        try await request(
             .GET,
             path: "/einvoice/api/payments",
             query: [
                 "last_timestamp": lastTimeStamp,
                 "limit": String(limit)
-            ],
-            callBack: callBack
+            ]
         )
     }
 
-    public func getStatAsync(
+    public func getStat(
         dateFrom: String,
-        dateTo: String,
-        callBack: @escaping (ApiResponse<Stat>) -> Void
-    ) {
-        request(
+        dateTo: String
+    ) async throws -> ApiResponse<Stat> {
+        try await request(
             .GET,
             path: "/merchant/stat",
             query: [
                 "date_from": dateFrom,
                 "date_to": dateTo
-            ],
-            callBack: callBack
+            ]
         )
     }
 
-    public func getSupportedBanksAsync(
-        callBack: @escaping (ApiResponse<[SupportedBank]>) -> Void
-    ) {
-        request(
+    public func getSupportedBanks() async throws -> ApiResponse<[SupportedBank]> {
+        try await request(
             .GET,
-            path: "/einvoice/api/banks",
-            callBack: callBack
+            path: "/einvoice/api/banks"
         )
     }
 
@@ -202,14 +215,39 @@ public final class WeBirrClient {
         _ verb: Verb,
         path: String,
         query: [String: String] = [:],
+        body: T
+    ) async throws -> ApiResponse<V> {
+        try await withCheckedThrowingContinuation { continuation in
+            request(verb, path: path, query: query, body: body) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+
+    private func request<V: Decodable>(
+        _ verb: Verb,
+        path: String,
+        query: [String: String] = [:]
+    ) async throws -> ApiResponse<V> {
+        try await withCheckedThrowingContinuation { continuation in
+            request(verb, path: path, query: query) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+
+    private func request<T: Encodable, V: Decodable>(
+        _ verb: Verb,
+        path: String,
+        query: [String: String] = [:],
         body: T,
-        callBack: @escaping (ApiResponse<V>) -> Void
+        callBack: @escaping (Result<ApiResponse<V>, Error>) -> Void
     ) {
         do {
             let bodyData = try JSONEncoder().encode(body)
             send(verb, path: path, query: query, bodyData: bodyData, callBack: callBack)
         } catch {
-            callBack(ApiResponse(error: "local error \(error)"))
+            callBack(.failure(error))
         }
     }
 
@@ -217,7 +255,7 @@ public final class WeBirrClient {
         _ verb: Verb,
         path: String,
         query: [String: String] = [:],
-        callBack: @escaping (ApiResponse<V>) -> Void
+        callBack: @escaping (Result<ApiResponse<V>, Error>) -> Void
     ) {
         send(verb, path: path, query: query, bodyData: nil, callBack: callBack)
     }
@@ -227,10 +265,10 @@ public final class WeBirrClient {
         path: String,
         query: [String: String],
         bodyData: Data?,
-        callBack: @escaping (ApiResponse<V>) -> Void
+        callBack: @escaping (Result<ApiResponse<V>, Error>) -> Void
     ) {
         guard let url = buildURL(path: path, query: query) else {
-            callBack(ApiResponse(error: "local error invalid url"))
+            callBack(.failure(WeBirrPlatformError.invalidURL))
             return
         }
 
@@ -244,30 +282,34 @@ public final class WeBirrClient {
         }
 
         urlSession.dataTask(with: request) { data, response, error in
-            guard let data = data, error == nil else {
-                callBack(ApiResponse(error: error?.localizedDescription))
+            if let error = error {
+                callBack(.failure(error))
                 return
             }
 
             guard let response = response as? HTTPURLResponse else {
-                callBack(ApiResponse(error: "unknown error"))
+                callBack(.failure(WeBirrPlatformError.invalidHTTPResponse))
                 return
             }
 
             if response.statusCode < 200 || response.statusCode > 299 {
-                callBack(
-                    ApiResponse(
-                        error: "http error \(response.statusCode) \(HTTPURLResponse.localizedString(forStatusCode: response.statusCode))"
-                    )
-                )
+                callBack(.failure(WeBirrPlatformError.httpStatus(
+                    statusCode: response.statusCode,
+                    status: HTTPURLResponse.localizedString(forStatusCode: response.statusCode)
+                )))
+                return
+            }
+
+            guard let data = data, !data.isEmpty else {
+                callBack(.failure(WeBirrPlatformError.emptyResponse(statusCode: response.statusCode)))
                 return
             }
 
             do {
                 let resp = try JSONDecoder().decode(ApiResponse<V>.self, from: data)
-                callBack(resp)
+                callBack(.success(resp))
             } catch {
-                callBack(ApiResponse(error: "local error \(error)"))
+                callBack(.failure(error))
             }
         }.resume()
     }
