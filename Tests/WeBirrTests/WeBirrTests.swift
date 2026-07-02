@@ -173,6 +173,15 @@ final class WeBirrTests: XCTestCase {
         XCTAssertTrue(bulkPayment.isReversed)
         XCTAssertEqual(bulkPayment.updateTimeStamp, "20250101100100000001")
 
+        let webhookPayload = try JSONDecoder().decode(PaymentWebhookPayload.self, from: jsonData(paymentWebhookPayloadJson()))
+        XCTAssertEqual(webhookPayload.status, 2)
+        XCTAssertEqual(webhookPayload.data.status, webhookPayload.status)
+        XCTAssertEqual(webhookPayload.data.bankID, "cbe_mobile")
+        XCTAssertEqual(webhookPayload.data.paymentReference, "FTC356A577695")
+        XCTAssertEqual(webhookPayload.data.wbcCode, "000 000 000")
+        XCTAssertEqual(webhookPayload.data.updateTimeStamp, "2026062512000000000")
+        XCTAssertEqual(webhookPayload.data.time, webhookPayload.data.paymentDate)
+
         let stat = try JSONDecoder().decode(Stat.self, from: jsonData([
             "nBills": 2,
             "nBillsPaid": 1,
@@ -619,6 +628,27 @@ final class WeBirrTests: XCTestCase {
             "amount": "270.90",
             "wbcCode": "123 456 789",
             "updateTimeStamp": "20250101100100000001"
+        ]
+    }
+
+    private func paymentWebhookPayloadJson() -> [String: Any] {
+        [
+            "status": 2,
+            "data": [
+                "status": 2,
+                "id": 121356,
+                "bankID": "cbe_mobile",
+                "paymentReference": "FTC356A577695",
+                "paymentDate": "2026-06-25 12:00:00",
+                "time": "2026-06-25 12:00:00",
+                "confirmed": true,
+                "confirmedTime": "2026-06-25 12:00:00",
+                "canceled": false,
+                "canceledTime": "",
+                "amount": "100.00",
+                "wbcCode": "000 000 000",
+                "updateTimeStamp": "2026062512000000000"
+            ]
         ]
     }
 

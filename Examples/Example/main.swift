@@ -220,8 +220,8 @@ struct Example {
         }
 
         do {
-            let payment = try JSONDecoder().decode(PaymentResponse.self, from: rawBody)
-            processPayment(payment)
+            let payload = try JSONDecoder().decode(PaymentWebhookPayload.self, from: rawBody)
+            processPayment(payload.data)
             return (200, "{\"error\":null}")
         } catch {
             return (400, "{\"error\":\"invalid json\"}")
@@ -264,9 +264,10 @@ final class BulkPaymentPollingConsumer {
                 Example.processPayment(payment)
                 if !payment.updateTimeStamp.isEmpty {
                     lastTimeStamp = payment.updateTimeStamp
-                    print("Last Timestamp: \(lastTimeStamp)") // save updateTimeStamp to your database for the next getPayments() call
+                    print("Next cursor candidate: \(lastTimeStamp)")
                 }
             }
+            // Save lastTimeStamp to your database only after the batch is processed successfully.
         } else {
             // fail
             print("error: \(payments.error!)")

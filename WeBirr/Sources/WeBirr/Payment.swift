@@ -188,6 +188,16 @@ public struct PaymentResponse: Codable, Equatable {
     }
 }
 
+public struct PaymentWebhookPayload: Codable, Equatable {
+    public var status: Int
+    public var data: PaymentResponse
+
+    public init(status: Int = 0, data: PaymentResponse = PaymentResponse()) {
+        self.status = status
+        self.data = data
+    }
+}
+
 extension PaymentDetail {
     fileprivate static func decodeString<K: CodingKey>(
         _ container: KeyedDecodingContainer<K>,

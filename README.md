@@ -309,9 +309,10 @@ class BulkPaymentPollingConsumer {
                 self.processPayment(payment)
                 if !payment.updateTimeStamp.isEmpty {
                     self.lastTimeStamp = payment.updateTimeStamp
-                    print("Last Timestamp: \(self.lastTimeStamp)") // save updateTimeStamp to your database for the next getPayments() call
+                    print("Next cursor candidate: \(self.lastTimeStamp)")
                 }
             }
+            // Save lastTimeStamp to your database only after the batch is processed successfully.
         } else {
             // fail
             print("error: \(payments.error!)")
@@ -354,8 +355,8 @@ func processWebhookPayment(rawBody: Data, authKey: String?) -> (statusCode: Int,
     }
 
     do {
-        let payment = try JSONDecoder().decode(PaymentResponse.self, from: rawBody)
-        processPayment(payment)
+        let payload = try JSONDecoder().decode(PaymentWebhookPayload.self, from: rawBody)
+        processPayment(payload.data)
         return (200, "{\"error\":null}")
     } catch {
         return (400, "{\"error\":\"invalid json\"}")
